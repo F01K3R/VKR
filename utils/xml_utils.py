@@ -1,12 +1,13 @@
-import zipfile
-import xml.etree.ElementTree as ET
-
+from lxml import etree as ET
+from zipfile import ZipFile
+from io import BytesIO
 
 def extract_xml(file_path):
-    with zipfile.ZipFile(file_path, 'r') as zip_ref:
-        zip_ref.extractall('extracted_docx')
-    doc_xml = ET.parse('extracted_docx/word/document.xml')
-    styles_xml = ET.parse('extracted_docx/word/styles.xml')
+    with ZipFile(file_path, 'r') as zip_ref:
+        doc_xml_data = zip_ref.read('word/document.xml')
+        styles_xml_data = zip_ref.read('word/styles.xml')
+    doc_xml = ET.parse(BytesIO(doc_xml_data))
+    styles_xml = ET.parse(BytesIO(styles_xml_data))
     return doc_xml, styles_xml
 
 def get_styles(styles_xml):

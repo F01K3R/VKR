@@ -15,24 +15,32 @@ class ReferencesCheck(CheckModule):
         }
 
         # Собираем текст из параграфов
-        paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+        paragraphs = [p.text.strip() for p in doc.paragraphs]
         ref_section = []
         in_references = False
         ref_headers = ["список источников", "список литературы", "литература", "references"]
 
         # Ищем начало списка источников
+        has_ref_header = False
         for para in paragraphs:
             para_lower = para.lower()
             if not in_references and para_lower in ref_headers:
                 in_references = True
+                has_ref_header = True
                 continue
             elif in_references:
                 if re.match(r"^(Приложение|Выводы|Заключение|Рисунок|Таблица)", para):
                     break
                 ref_section.append(para)
 
-        if not ref_section:
+        # Если заголовка нет, возвращаем ошибку об отсутствии раздела
+        if not has_ref_header:
             return "No references section found"
+
+        # Проверяем, есть ли хоть одна ссылка
+        valid_refs = [line for line in ref_section if line.strip() and re.search(r"\d{4}|\s//|\sС\.|\sURL:", line)]
+        if not valid_refs:
+            return "References section is empty"
 
         errors = []
         for line in ref_section:

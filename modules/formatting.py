@@ -1,14 +1,24 @@
 from .base import CheckModule
+from docx.document import Document
+from lxml import etree
 
 class FormattingCheck(CheckModule):
-    def check(self, doc_xml, styles, params):
+    def check(self, doc_xml, ns, params):
+        # Поддержка разных типов входных данных
+        if isinstance(doc_xml, Document):
+            root = doc_xml.element  # Для Document
+        elif isinstance(doc_xml, etree._ElementTree):
+            root = doc_xml.getroot()  # Для ElementTree
+        else:
+            root = doc_xml  # Если уже Element
         ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
         errors = []
         expected_font = params.get("font", "Times New Roman")
         expected_size = params.get("font_size", 12) * 2  # Размер в half-points для DOCX
 
+
         # Проходим по всем параграфам в XML
-        for para_idx, para in enumerate(doc_xml.findall('.//w:p', namespaces=ns), start=1):
+        for para_idx, para in enumerate(root.findall('.//w:p', namespaces=ns), start=1):
             page_number = self._get_page_number(para_idx)
             # Собираем текст параграфа из всех <w:t> элементов
             text_elements = para.findall('.//w:t', namespaces=ns)

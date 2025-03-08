@@ -4,7 +4,7 @@ from .base import CheckModule
 class PageParamsCheck(CheckModule):
     def check(self, document, params):
         expected_size = params.get("page_size", "A4")
-        margins = params.get("margins", {"left": 2, "right": 1, "top": 2, "bottom": 2})
+        margins = params.get("margins", {"left": 3, "right": 1, "top": 2, "bottom": 2})
         errors = []
 
         # Допуск для сравнения размеров (в см)
@@ -40,7 +40,7 @@ class PageParamsCheck(CheckModule):
                     f"Секция {i}: Bottom margin ({section.bottom_margin.cm:.2f} см) is less than expected ({margins.get('bottom')} см)")
 
         # Отладочный вывод для проверки реальных значений
-        for i, section in enumerate(document.sections, start=1):
-            print(f"Секция {i}: {section.page_width.cm:.2f} x {section.page_height.cm:.2f} см")
+        #for i, section in enumerate(document.sections, start=1):
+            #print(f"Секция {i}: {section.page_width.cm:.2f} x {section.page_height.cm:.2f} см")
 
         return errors if errors else "Page parameters check passed"

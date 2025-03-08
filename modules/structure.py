@@ -37,12 +37,14 @@ class StructureCheck(CheckModule):
 
         # Проверка порядка разделов
         if len(found_sections) > 1:
+            prev_section = None
             prev_pos = -1
             for section in required_sections:
                 if section in found_sections:
                     curr_pos = found_sections[section]
                     if curr_pos < prev_pos:
-                        errors.append(f"Нарушение порядка разделов: '{section}' находится перед предыдущим разделом")
+                        errors.append(f"Нарушение порядка разделов: '{section}' находится после '{prev_section}'")
                     prev_pos = curr_pos
+                    prev_section = section
 
         return errors if errors else "Structure check passed"
