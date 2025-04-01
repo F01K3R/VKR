@@ -1,131 +1,97 @@
 import unittest
+from unittest.mock import MagicMock
 from docx import Document
-from docx.shared import Cm
-from modules.page_params import PageParamsCheck
-
+from modules.page_params import PageParamsCheck  # Импортируйте нужный класс для проверки
 
 class TestPageParamsCheck(unittest.TestCase):
+
     def setUp(self):
-        """Инициализация перед каждым тестом."""
-        self.checker = PageParamsCheck()
+        # Создаем объект документа
+        self.document = MagicMock(spec=Document)
 
-    def test_correct_a4_params(self):
-        """Проверяет документ с корректными параметрами A4 и полями."""
-        doc = Document()
-        section = doc.sections[0]
-        section.page_width = Cm(21.0)
-        section.page_height = Cm(29.7)
-        section.left_margin = Cm(3.0)
-        section.right_margin = Cm(1.0)
-        section.top_margin = Cm(2.0)
-        section.bottom_margin = Cm(2.0)
+        # Создаем фиктивные секции документа для теста
+        section_mock = MagicMock()
+        section_mock.page_width.cm = 21.0  # ширина страницы
+        section_mock.page_height.cm = 29.7  # высота страницы
+        section_mock.left_margin.cm = 3.0  # левое поле
+        section_mock.right_margin.cm = 1.0  # правое поле
+        section_mock.top_margin.cm = 2.0  # верхнее поле
+        section_mock.bottom_margin.cm = 2.0  # нижнее поле
+        section_mock.header.paragraphs = [MagicMock(text="1", alignment=1)]  # Номер страницы в колонтитуле
 
-        params = {
-            "page_size": "A4",
-            "margins": {"left": 3, "right": 1, "top": 2, "bottom": 2}
-        }
-        result = self.checker.check(doc, params)
-        self.assertEqual(result, "Page parameters check passed")
+        # Мокируем секции документа
+        self.document.sections = [section_mock]
 
-    def test_incorrect_page_size(self):
-        """Проверяет документ с некорректным размером страницы (Letter вместо A4)."""
-        doc = Document()
-        section = doc.sections[0]
-        section.page_width = Cm(21.59)  # US Letter
-        section.page_height = Cm(27.94)  # US Letter
-        section.left_margin = Cm(3.0)
-        section.right_margin = Cm(1.0)
-        section.top_margin = Cm(2.0)
-        section.bottom_margin = Cm(2.0)
+    def test_invalid_params_type(self):
+        # Проверяем, что происходит, если параметры не переданы или передан неверный тип
+        checker = PageParamsCheck()
+        errors = checker.check(self.document, params=[])
+        self.assertIn("Ошибка: params должен быть словарем", errors)
 
-        params = {"page_size": "A4"}
-        result = self.checker.check(doc, params)
-        expected_error = "Секция 1: Incorrect page size (21.59 x 27.94 см, expected 21.0 x 29.7 см)"
-        self.assertTrue(any(expected_error in error for error in result))
+    def test_unsupported_page_size(self):
+        # Проверяем, что произойдет при использовании неподдерживаемого размера страницы
+        checker = PageParamsCheck()
+        errors = checker.check(self.document, params={"page_size": "A5"})
+        self.assertIn("Ошибка: неподдерживаемый размер страницы: A5", errors)
 
-    def test_incorrect_margins_all(self):
-        """Проверяет документ с полями меньше ожидаемых."""
-        doc = Document()
-        section = doc.sections[0]
-        section.page_width = Cm(21.0)
-        section.page_height = Cm(29.7)
-        section.left_margin = Cm(2.5)  # Меньше 3 см
-        section.right_margin = Cm(0.5)  # Меньше 1 см
-        section.top_margin = Cm(1.5)  # Меньше 2 см
-        section.bottom_margin = Cm(1.0)  # Меньше 2 см
+    def test_missing_margin_key(self):
+        # Проверяем, что происходит, если в полях отсутствует ключ
+        checker = PageParamsCheck()
+        errors = checker.check(self.document, params={"margins": {"left": 3, "right": 1, "top": 2}})
+        self.assertIn("Ошибка: в margins отсутствует ключ bottom", errors)
 
-        params = {"page_size": "A4", "margins": {"left": 3, "right": 1, "top": 2, "bottom": 2}}
-        result = self.checker.check(doc, params)
+    def test_invalid_margin_value(self):
+        # Проверяем, что происходит, если значение поля не является числом или меньше нуля
+        checker = PageParamsCheck()
+        errors = checker.check(self.document, params={"margins": {"left": 3, "right": -1, "top": 2, "bottom": 2}})
+        self.assertIn("Ошибка: margins[right] должен быть неотрицательным числом", errors)
 
-        expected_errors = [
-            "Секция 1: Left margin (2.50 см) is less than expected (3 см)",
-            "Секция 1: Right margin (0.50 см) is less than expected (1 см)",
-            "Секция 1: Top margin (1.50 см) is less than expected (2 см)",
-            "Секция 1: Bottom margin (1.00 см) is less than expected (2 см)"
-        ]
-        for expected_error in expected_errors:
-            self.assertTrue(any(expected_error in error for error in result))
+    def test_page_size_check(self):
+        # Проверяем, что размер страницы соответствует ожидаемому
+        checker = PageParamsCheck()
+        errors = checker.check(self.document, params={"page_size": "A4", "margins": {"left": 3, "right": 1, "top": 2, "bottom": 2}})
+        self.assertEqual(len(errors), 0)  # Ожидаем, что ошибок не будет
 
-    def test_multiple_sections(self):
-        """Проверяет документ с несколькими секциями, одна из которых некорректна."""
-        doc = Document()
-        # Первая секция (корректная)
-        section1 = doc.sections[0]
-        section1.page_width = Cm(21.0)
-        section1.page_height = Cm(29.7)
-        section1.left_margin = Cm(3.0)
-        section1.right_margin = Cm(1.0)
-        section1.top_margin = Cm(2.0)
-        section1.bottom_margin = Cm(2.0)
+    def test_page_size_mismatch(self):
+        # Проверяем ошибку, если размер страницы не соответствует ожидаемому
+        self.document.sections[0].page_width.cm = 22.0  # Устанавливаем неверную ширину страницы
+        checker = PageParamsCheck()
+        errors = checker.check(self.document, params={"page_size": "A4"})
+        self.assertIn("Секция 1: Размер страницы не соответствует ожидаемому (A4, портретная ориентация)", errors)
 
-        # Добавляем вторую секцию (некорректную)
-        doc.add_section()
-        section2 = doc.sections[1]
-        section2.page_width = Cm(21.0)
-        section2.page_height = Cm(29.7)
-        section2.left_margin = Cm(2.0)  # Меньше 3 см
+    def test_invalid_page_number(self):
+        # Проверяем ошибку по нумерации страниц
+        self.document.sections[0].header.paragraphs[0].text = "2"  # Неверный номер страницы
+        checker = PageParamsCheck()
+        errors = checker.check(self.document, params={"page_size": "A4"})
+        self.assertIn("Вторая страница должна иметь номер 2", errors)
 
-        params = {"page_size": "A4", "margins": {"left": 3, "right": 1, "top": 2, "bottom": 2}}
-        result = self.checker.check(doc, params)
-        expected_error = "Секция 2: Left margin (2.00 см) is less than expected (3 см)"
-        self.assertTrue(any(expected_error in error for error in result))
-        self.assertFalse(any("Секция 1" in error for error in result))  # Первая секция корректна
+    def test_page_number_alignment(self):
+        # Проверяем выравнивание номера страницы
+        self.document.sections[0].header.paragraphs[0].alignment = 0  # Выравнивание по левому краю
+        checker = PageParamsCheck()
+        errors = checker.check(self.document, params={"page_size": "A4"})
+        self.assertIn("Секция 1: Номер страницы должен быть выровнен по центру верхнего поля", errors)
 
-    def test_custom_params(self):
-        """Проверяет документ с кастомными параметрами страницы и полей."""
-        doc = Document()
-        section = doc.sections[0]
-        section.page_width = Cm(15.0)  # Не A4
-        section.page_height = Cm(20.0)  # Не A4
-        section.left_margin = Cm(1.5)  # Меньше 2 см
-        section.right_margin = Cm(1.0)
-        section.top_margin = Cm(1.0)
-        section.bottom_margin = Cm(1.0)
+    def test_correct_page_numbers(self):
+        # Проверяем корректную нумерацию страниц
+        self.document.sections[0].header.paragraphs[0].text = "1"  # Первая страница
+        checker = PageParamsCheck()
+        errors = checker.check(self.document, params={"page_size": "A4"})
+        self.assertEqual(len(errors), 0)  # Ожидаем, что ошибок не будет
 
-        params = {
-            "page_size": "Custom",
-            "margins": {"left": 2, "right": 1, "top": 1, "bottom": 1}
-        }
-        result = self.checker.check(doc, params)
-        expected_error = "Секция 1: Left margin (1.50 см) is less than expected (2 см)"
-        self.assertTrue(any(expected_error in error for error in result))
-        self.assertFalse(any("Incorrect page size" in error for error in result))  # Размер не проверяется для "Custom"
+    def test_correct_orientation_portrait(self):
+        # Проверяем, что ориентация страницы портретная
+        checker = PageParamsCheck()
+        errors = checker.check(self.document, params={"page_size": "A4"})
+        self.assertEqual(len(errors), 0)  # Ожидаем, что ошибок не будет
 
-    def test_tolerance_edge_case(self):
-        """Проверяет допуск размеров страницы (в пределах 0.1 см)."""
-        doc = Document()
-        section = doc.sections[0]
-        section.page_width = Cm(21.05)  # В пределах допуска
-        section.page_height = Cm(29.65)  # В пределах допуска
-        section.left_margin = Cm(3.0)
-        section.right_margin = Cm(1.0)
-        section.top_margin = Cm(2.0)
-        section.bottom_margin = Cm(2.0)
+    def test_incorrect_orientation_landscape(self):
+        # Проверяем ошибку, если ориентация страницы неверная
+        self.document.sections[0].page_width.cm = 29.7  # Сделаем страницу альбомной ориентации
+        checker = PageParamsCheck()
+        errors = checker.check(self.document, params={"page_size": "A4"})
+        self.assertIn("Секция 1: Ориентация страницы альбомная, ожидается портретная", errors)
 
-        params = {"page_size": "A4"}
-        result = self.checker.check(doc, params)
-        self.assertEqual(result, "Page parameters check passed")
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

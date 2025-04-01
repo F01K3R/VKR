@@ -1,6 +1,7 @@
 import time
 import psutil
 import os
+import sys
 import threading
 import random
 import string
@@ -88,13 +89,20 @@ def infinite_load_test(num_files=10, base_paragraphs=100, num_processes=4):
             pool = None
             total_time = time.time() - start_time
 
-            # Обработка результатов
+            # Собираем времена обработки всех файлов
+            file_times = [result["time"] for result in results_list]
+            avg_time_per_file = sum(file_times) / len(file_times) if file_times else 0
+
+            # Вывод результатов
             for result in results_list:
-                for file_path, file_results in result.items():
-                    print(f"File {file_path}:")
-                    for check, res in file_results.items():
-                        print(f"  {check}: {res}")
+                file_path = result["file_path"]
+                file_results = result["results"]
+                processing_time = result["time"]
+                print(f"File {file_path} (время обработки: {processing_time:.2f}s):")
+                for check, res in file_results.items():
+                    print(f"  {check}: {res}")
             print(f"Total Time for {num_files} files: {total_time:.2f}s")
+            print(f"Average Time per File: {avg_time_per_file:.2f}s")
 
     except KeyboardInterrupt:
         print("\nОстановка тестирования через KeyboardInterrupt...")
@@ -110,4 +118,4 @@ def infinite_load_test(num_files=10, base_paragraphs=100, num_processes=4):
 
 
 if __name__ == "__main__":
-    infinite_load_test(num_files=1000, base_paragraphs=100, num_processes=4)
+    infinite_load_test(num_files=10000, base_paragraphs=100, num_processes=8)

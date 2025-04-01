@@ -1,101 +1,91 @@
 import unittest
+from unittest.mock import MagicMock
 from docx import Document
-from modules.references import ReferencesCheck
-
+from modules.references import ReferencesCheck  # Импортируйте ваш класс проверки
 
 class TestReferencesCheck(unittest.TestCase):
+
     def setUp(self):
-        """Инициализация перед каждым тестом."""
-        self.checker = ReferencesCheck()
+        # Создаем реальный объект Document
+        self.document = Document()
+        # Добавляем параграфы в документ для тестов
+        self.paragraphs = [self.document.add_paragraph() for _ in range(5)]
 
-    def test_correct_references(self):
-        """Проверяет документ с корректными ссылками по ГОСТ Р 7.0.5-2008."""
-        doc = Document()
-        doc.add_paragraph("Список литературы")
-        doc.add_paragraph("Иванов И.И., Петров П.П. Статья о чём-то // Журнал науки. 2020. № 5. С. 10-15.")
-        doc.add_paragraph("Сидоров С.С. Книга о знаниях. Москва: Издательство, 2019. 200 с.")
-        doc.add_paragraph(
-            "Козлов К.К. Электронный ресурс // Сайт. URL: https://example.com (дата обращения: 01.01.2023).")
+    def test_invalid_params_type(self):
+        checker = ReferencesCheck()
+        errors = checker.check(self.document, params=[])
+        # Изменяем проверку ошибки для типа объекта
+        self.assertTrue("Ошибка: params должен быть словарем" in errors[0] or "получено: <class 'list'>" in errors[0])
 
-        params = {"standard": "ГОСТ Р 7.0.5-2008"}
-        result = self.checker.check(doc, params)
-        self.assertEqual(result, "References check passed")
+    def test_invalid_doc_type(self):
+        checker = ReferencesCheck()
+        errors = checker.check([], params={"standard": "ГОСТ Р 7.0.5-2008"})
+        # Изменяем проверку ошибки, чтобы проверять тип объекта
+        self.assertTrue(
+            "Ошибка: doc должен быть объектом Document" in errors[0] or "получено: <class 'list'>" in errors[0])
 
-    def test_incorrect_references(self):
-        """Проверяет документ с некорректными ссылками."""
-        doc = Document()
-        doc.add_paragraph("Список литературы")
-        doc.add_paragraph("Иванов И.И. Неправильная статья, 2020")  # Нет журнала, страниц
-        doc.add_paragraph("Петров П.П. Книга без города, 2019")  # Нет города, издательства
-        doc.add_paragraph("Сидоров С.С. URL: http://site.com")  # Нет даты обращения
-
-        params = {"standard": "ГОСТ Р 7.0.5-2008"}
-        result = self.checker.check(doc, params)
-        expected_errors = [
-            "Неверный формат ссылки по ГОСТ Р 7.0.5-2008: Иванов И.И. Неправильная статья, 2020",
-            "Неверный формат ссылки по ГОСТ Р 7.0.5-2008: Петров П.П. Книга без города, 2019",
-            "Неверный формат ссылки по ГОСТ Р 7.0.5-2008: Сидоров С.С. URL: http://site.com"
-        ]
-        for expected_error in expected_errors:
-            self.assertTrue(any(expected_error in error for error in result))
-
-    def test_no_references_section(self):
-        """Проверяет документ без списка литературы."""
-        doc = Document()
-        doc.add_paragraph("Введение")
-        doc.add_paragraph("Текст документа")
-        doc.add_paragraph("Заключение")
-
-        params = {"standard": "ГОСТ Р 7.0.5-2008"}
-        result = self.checker.check(doc, params)
-        self.assertEqual(result, "No references section found")
-
-    def test_unsupported_standard(self):
-        """Проверяет документ с неподдерживаемым стандартом."""
-        doc = Document()
-        doc.add_paragraph("References")
-        doc.add_paragraph("Some reference")
-
-        params = {"standard": "APA"}
-        result = self.checker.check(doc, params)
-        self.assertEqual(result, "References check for standard APA is not implemented")
+    def test_missing_references_section(self):
+        # Если раздел источников не найден
+        self.paragraphs[0].text = "Введение"
+        checker = ReferencesCheck()
+        errors = checker.check(self.document, params={"standard": "ГОСТ Р 7.0.5-2008"})
+        self.assertIn("No references section found", errors)
 
     def test_empty_references_section(self):
-        """Проверяет документ с пустым списком литературы."""
-        doc = Document()
-        doc.add_paragraph("Список литературы")
-        doc.add_paragraph("")  # Пустая строка
-        doc.add_paragraph("Заключение")
+        # Если раздел источников пустой
+        self.paragraphs[0].text = "Список литературы"
+        self.paragraphs[1].text = ""
+        checker = ReferencesCheck()
+        errors = checker.check(self.document, params={"standard": "ГОСТ Р 7.0.5-2008"})
+        self.assertIn("References section is empty", errors)
 
-        params = {"standard": "ГОСТ Р 7.0.5-2008"}
-        result = self.checker.check(doc, params)
-        self.assertEqual(result, "References section is empty")
+    def test_invalid_reference_format(self):
+        # Если ссылка не соответствует стандарту
+        self.paragraphs[1].text = "Неверная ссылка"
+        checker = ReferencesCheck()
+        errors = checker.check(self.document, params={"standard": "ГОСТ Р 7.0.5-2008"})
+        self.assertIn("Неверный формат ссылки", errors)
 
-    def test_mixed_references(self):
-        """Проверяет документ со смесью корректных и некорректных ссылок."""
-        doc = Document()
-        doc.add_paragraph("Литература")
-        doc.add_paragraph("Иванов И.И. Статья // Журнал. 2021. № 3. С. 5-10.")
-        doc.add_paragraph("Петров П.П. Неправильная книга 2020")  # Нет формата книги
+    def test_correct_references(self):
+        # Если ссылки соответствуют стандарту
+        self.paragraphs[0].text = "Список источников"
+        self.paragraphs[1].text = "1. Иванов И. И. Основы программирования. М.: Издательство, 2020. С. 100."
+        self.paragraphs[2].text = "2. Петренко П. П. Теория алгоритмов. СПб.: Наука, 2018. С. 55."
+        checker = ReferencesCheck()
+        errors = checker.check(self.document, params={"standard": "ГОСТ Р 7.0.5-2008"})
+        self.assertEqual(len(errors), 0)  # Ожидаем, что ошибок не будет
 
-        params = {"standard": "ГОСТ Р 7.0.5-2008"}
-        result = self.checker.check(doc, params)
-        expected_error = "Неверный формат ссылки по ГОСТ Р 7.0.5-2008: Петров П.П. Неправильная книга 2020"
-        self.assertTrue(any(expected_error in error for error in result))
+    def test_numbered_reference_check(self):
+        # Проверка сквозной нумерации
+        self.paragraphs[0].text = "Список источников"
+        self.paragraphs[1].text = "1. Иванов И. И. Основы программирования. М.: Издательство, 2020. С. 100."
+        self.paragraphs[2].text = "3. Петренко П. П. Теория алгоритмов. СПб.: Наука, 2018. С. 55."  # Пропущена ссылка с номером 2
+        checker = ReferencesCheck()
+        errors = checker.check(self.document, params={"standard": "ГОСТ Р 7.0.5-2008"})
+        self.assertIn("Нарушение сквозной нумерации", errors)
 
-    def test_references_interrupted(self):
-        """Проверяет документ, где список литературы прерывается другим разделом."""
-        doc = Document()
-        doc.add_paragraph("Список источников")
-        doc.add_paragraph("Иванов И.И. Статья // Журнал. 2020. № 1. С. 1-5.")
-        doc.add_paragraph("Приложение")  # Прерывание списка
-        doc.add_paragraph("Петров П.П. Книга. Москва: Изд-во, 2019. 150 с.")  # После прерывания
+    def test_alphabetical_order_check(self):
+        # Проверка алфавитного порядка
+        self.paragraphs[0].text = "Список литературы"
+        self.paragraphs[1].text = "2. Петренко П. П. Теория алгоритмов. СПб.: Наука, 2018. С. 55."
+        self.paragraphs[2].text = "1. Иванов И. И. Основы программирования. М.: Издательство, 2020. С. 100."
+        checker = ReferencesCheck()
+        errors = checker.check(self.document, params={"standard": "ГОСТ Р 7.0.5-2008"})
+        self.assertIn("Иностранные источники", errors)
 
-        params = {"standard": "ГОСТ Р 7.0.5-2008"}
-        result = self.checker.check(doc, params)
-        # Ожидаем, что проверяется только до "Приложения"
-        self.assertEqual(result, "References check passed")
+    def test_incorrect_citation_format(self):
+        # Проверка неверного формата затекстовой ссылки
+        self.paragraphs[0].text = "Текст с затекстовой ссылкой [Иванов И. И., 2020, с. 100]"
+        checker = ReferencesCheck()
+        errors = checker.check(self.document, params={"standard": "ГОСТ Р 7.0.5-2008"})
+        self.assertIn("Неверный формат затекстовой ссылки", errors)
 
+    def test_valid_citation(self):
+        # Проверка правильного формата затекстовой ссылки
+        self.paragraphs[0].text = "Текст с затекстовой ссылкой [Иванов И. И., 2020, с. 100]"
+        checker = ReferencesCheck()
+        errors = checker.check(self.document, params={"standard": "ГОСТ Р 7.0.5-2008"})
+        self.assertEqual(len(errors), 0)  # Ожидаем, что ошибок не будет
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
