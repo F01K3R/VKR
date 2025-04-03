@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def process_file(args):
     """Обрабатывает один файл и возвращает результаты вместе с временем обработки."""
-    file_path, file_index = args
+    file_path, file_index, reports_dir = args  # Добавляем reports_dir как параметр
     logger.debug(f"Начало обработки файла: {file_path} (индекс: {file_index})")
     try:
         if not os.path.exists(file_path):
@@ -60,15 +60,15 @@ def process_file(args):
             appendices_params={"appendix_number_style": "numeric"}
         )
 
-        reports_dir = "reports"
+        # Проверяем, что директория для отчётов существует и доступна
         try:
             os.makedirs(reports_dir, exist_ok=True)
             os.chmod(reports_dir, 0o700)
         except Exception as e:
-            logger.error(f"Ошибка при создании директории reports: {str(e)}")
+            logger.error(f"Ошибка при создании директории {reports_dir}: {str(e)}")
             return {
                 "file_path": file_path,
-                "results": {"error": [f"Ошибка при создании директории reports: {str(e)}"]},
+                "results": {"error": [f"Ошибка при создании директории {reports_dir}: {str(e)}"]},
                 "time": 0.0
             }
 
@@ -97,7 +97,7 @@ def process_file(args):
             "time": 0.0
         }
 
-def process_multiple_files(file_paths, num_processes=None):
+def process_multiple_files(file_paths, reports_dir, num_processes=None):
     """Обрабатывает несколько файлов параллельно."""
     if not file_paths:
         logger.error("Список файлов пуст")
@@ -109,7 +109,7 @@ def process_multiple_files(file_paths, num_processes=None):
 
     logger.info(f"Обработка {len(file_paths)} файлов с использованием {num_processes} процессов...")
 
-    file_args = [(file_path, idx) for idx, file_path in enumerate(file_paths)]
+    file_args = [(file_path, idx, reports_dir) for idx, file_path in enumerate(file_paths)]
 
     try:
         with Pool(processes=num_processes) as pool:
@@ -144,6 +144,8 @@ def main():
     parser.add_argument("files", nargs='+', help="Путь к файлам .docx для обработки")
     parser.add_argument("--processes", type=int, default=None,
                         help="Количество процессов для параллельной обработки (по умолчанию: число CPU или количество файлов)")
+    parser.add_argument("--reports-dir", type=str, default="reports",
+                        help="Директория для сохранения отчётов (по умолчанию: reports)")
 
     args = parser.parse_args()
 
@@ -163,7 +165,7 @@ def main():
         return
 
     # Обрабатываем файлы
-    results_list = process_multiple_files(input_files, num_processes=args.processes)
+    results_list = process_multiple_files(input_files, args.reports_dir, num_processes=args.processes)
 
     # Выводим результаты
     for result in results_list:
