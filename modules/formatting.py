@@ -1,10 +1,9 @@
 import logging
-from docx import __version__ as docx_version
 from docx.document import Document
 from docx.oxml.ns import qn
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from modules.base import CheckModule
-from utils.xml_utils import extract_xml, get_styles
+from utils.xml_utils import extract_xml
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -100,7 +99,7 @@ class FormattingCheck(CheckModule):
                         run_sizes.add(style_sizes[style_id])
                 if run_sizes:
                     font_size = run_sizes.pop() if len(run_sizes) == 1 else None
-                    expected_size = 12 if "сноск" in para.text.lower() or "таблиц" in para.text.lower() or "приложени" in para.text.lower() else expected_font_size
+                    expected_size = 12 if R"^сноск" in para.text.lower() or r"^таблиц" in para.text.lower() or r"^приложени" in para.text.lower() or r"^рис" in para.text.lower() else expected_font_size
                     if font_size and font_size != expected_size:
                         errors.append(f"Параграф {i + 1}: Размер шрифта {font_size} pt, ожидается {expected_size} pt")
 
